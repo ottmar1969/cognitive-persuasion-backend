@@ -72,8 +72,11 @@ def create_app():
     with app.app_context():
         db.create_all()
         # Initialize sample data
-        from src.utils.init_data_simple import init_sample_data
-        init_sample_data()
+        try:
+            from src.utils.init_data_simple import initialize_predefined_data
+            initialize_predefined_data()
+        except Exception as e:
+            print(f"Warning: Could not initialize predefined data: {e}")
     
     return app
 
