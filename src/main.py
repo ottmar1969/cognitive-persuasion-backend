@@ -14,6 +14,8 @@ from src.routes.auth_simple import auth_bp
 from src.routes.business_simple import business_bp
 from src.routes.audience_simple import audience_bp
 from src.routes.payment_simple import payment_bp
+from src.routes.api_routes import api_bp
+from src.routes.paypal_routes import paypal_bp
 
 # Load environment variables
 load_dotenv()
@@ -58,6 +60,8 @@ def create_app():
                 "businesses": "/api/businesses", 
                 "audiences": "/api/audiences",
                 "payments": "/api/payments",
+                "ai": "/api/ai",
+                "paypal": "/api/paypal",
                 "health": "/api/health"
             }
         })
@@ -67,6 +71,8 @@ def create_app():
     app.register_blueprint(business_bp, url_prefix='/api/businesses')
     app.register_blueprint(audience_bp, url_prefix='/api/audiences')
     app.register_blueprint(payment_bp, url_prefix='/api/payments')
+    app.register_blueprint(api_bp, url_prefix='/api/ai')
+    app.register_blueprint(paypal_bp, url_prefix='/api/paypal')
     
     # Create tables
     with app.app_context():
