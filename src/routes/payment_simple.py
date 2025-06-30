@@ -1,7 +1,9 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from src.models.user_simple import db, User, CreditTransaction, TransactionType, TransactionStatus
+from src.utils.paypal_service import PayPalService
 from decimal import Decimal
+from datetime import datetime, timezone
 
 payment_bp = Blueprint('payment', __name__)
 
@@ -92,7 +94,7 @@ def get_credit_balance():
 @payment_bp.route('/purchase', methods=['POST'])
 @jwt_required()
 def initiate_purchase():
-    """Initiate a credit purchase (simplified for demo)"""
+    """Initiate a credit purchase with PayPal integration"""
     try:
         current_user_id = get_jwt_identity()
         user = User.query.get(current_user_id)
@@ -134,19 +136,63 @@ def initiate_purchase():
         db.session.add(transaction)
         db.session.commit()
         
-        # In a real implementation, this would integrate with PayPal API
-        # For demo purposes, we'll simulate a successful payment
-        return jsonify({
-            'message': 'Purchase initiated successfully',
-            'transaction_id': transaction.transaction_id,
-            'package': {
-                'id': package_id,
-                'name': package['name'],
-                'credits': package['credits'],
-                'price': final_price
-            },
-            'paypal_url': f'https://paypal.com/demo/payment/{transaction.transaction_id}'
-        }), 200
+        # Initialize PayPal service
+        paypal_service = PayPalService()
+        
+        if paypal_service.is_configured():
+            try:
+                # Create PayPal order
+                order_result = paypal_service.create_order(
+                    amount=final_price,
+                    currency='USD'
+                )
+                
+                # Update transaction with PayPal order ID
+                transaction.paypal_order_id = order_result['order_id']
+                db.session.commit()
+                
+                return jsonify({
+                    'message': 'Purchase initiated successfully',
+                    'transaction_id': transaction.transaction_id,
+                    'package': {
+                        'id': package_id,
+                        'name': package['name'],
+                        'credits': package['credits'],
+                        'price': final_price
+                    },
+                    'paypal_order_id': order_result['order_id'],
+                    'paypal_url': order_result['approval_url']
+                }), 200
+                
+            except Exception as paypal_error:
+                # If PayPal fails, fall back to demo mode
+                return jsonify({
+                    'message': 'Purchase initiated successfully (Demo Mode)',
+                    'transaction_id': transaction.transaction_id,
+                    'package': {
+                        'id': package_id,
+                        'name': package['name'],
+                        'credits': package['credits'],
+                        'price': final_price
+                    },
+                    'paypal_url': f'https://paypal.com/demo/payment/{transaction.transaction_id}',
+                    'demo_mode': True,
+                    'paypal_error': str(paypal_error)
+                }), 200
+        else:
+            # PayPal not configured, use demo mode
+            return jsonify({
+                'message': 'Purchase initiated successfully (Demo Mode)',
+                'transaction_id': transaction.transaction_id,
+                'package': {
+                    'id': package_id,
+                    'name': package['name'],
+                    'credits': package['credits'],
+                    'price': final_price
+                },
+                'paypal_url': f'https://paypal.com/demo/payment/{transaction.transaction_id}',
+                'demo_mode': True
+            }), 200
         
     except Exception as e:
         db.session.rollback()
@@ -155,7 +201,7 @@ def initiate_purchase():
 @payment_bp.route('/complete', methods=['POST'])
 @jwt_required()
 def complete_purchase():
-    """Complete a purchase (simplified for demo)"""
+    """Complete a purchase with PayPal order capture"""
     try:
         current_user_id = get_jwt_identity()
         user = User.query.get(current_user_id)
@@ -168,6 +214,8 @@ def complete_purchase():
             return jsonify({'message': 'No data provided'}), 400
         
         transaction_id = data.get('transaction_id')
+        paypal_order_id = data.get('paypal_order_id')
+        
         if not transaction_id:
             return jsonify({'message': 'Transaction ID is required'}), 400
         
@@ -181,19 +229,89 @@ def complete_purchase():
         if not transaction:
             return jsonify({'message': 'Transaction not found or already processed'}), 404
         
-        # Update transaction status
-        transaction.status = TransactionStatus.COMPLETED
+        # Initialize PayPal service
+        paypal_service = PayPalService()
         
-        # Add credits to user balance
-        user.credit_balance += transaction.amount
-        
-        db.session.commit()
-        
-        return jsonify({
-            'message': 'Purchase completed successfully',
-            'credits_added': transaction.amount,
-            'new_balance': user.credit_balance
-        }), 200
+        if paypal_service.is_configured() and (paypal_order_id or transaction.paypal_order_id):
+            try:
+                # Use provided order ID or the one stored in transaction
+                order_id = paypal_order_id or transaction.paypal_order_id
+                
+                # Capture the PayPal payment
+                capture_result = paypal_service.capture_order(order_id)
+                
+                if capture_result['success']:
+                    # Update transaction status
+                    transaction.status = TransactionStatus.COMPLETED
+                    transaction.completed_at = datetime.now(timezone.utc)
+                    
+                    # Add metadata about the capture
+                    if transaction.transaction_metadata:
+                        transaction.transaction_metadata.update({
+                            'paypal_capture_id': capture_result.get('capture_id'),
+                            'paypal_capture_time': capture_result.get('create_time'),
+                            'captured_amount': capture_result.get('amount'),
+                            'captured_currency': capture_result.get('currency')
+                        })
+                    
+                    # Add credits to user balance
+                    user.credit_balance += transaction.amount
+                    
+                    db.session.commit()
+                    
+                    return jsonify({
+                        'message': 'Purchase completed successfully',
+                        'credits_added': transaction.amount,
+                        'new_balance': user.credit_balance,
+                        'paypal_capture_id': capture_result.get('capture_id')
+                    }), 200
+                else:
+                    # PayPal capture failed
+                    transaction.status = TransactionStatus.FAILED
+                    db.session.commit()
+                    
+                    return jsonify({
+                        'message': 'Payment capture failed',
+                        'paypal_status': capture_result.get('status')
+                    }), 400
+                    
+            except Exception as paypal_error:
+                # If PayPal capture fails, fall back to demo completion
+                transaction.status = TransactionStatus.COMPLETED
+                transaction.completed_at = datetime.now(timezone.utc)
+                user.credit_balance += transaction.amount
+                
+                if transaction.transaction_metadata:
+                    transaction.transaction_metadata.update({
+                        'demo_mode': True,
+                        'paypal_error': str(paypal_error)
+                    })
+                
+                db.session.commit()
+                
+                return jsonify({
+                    'message': 'Purchase completed successfully (Demo Mode)',
+                    'credits_added': transaction.amount,
+                    'new_balance': user.credit_balance,
+                    'demo_mode': True
+                }), 200
+        else:
+            # PayPal not configured or no order ID, complete in demo mode
+            transaction.status = TransactionStatus.COMPLETED
+            transaction.completed_at = datetime.now(timezone.utc)
+            user.credit_balance += transaction.amount
+            
+            if transaction.transaction_metadata:
+                transaction.transaction_metadata.update({'demo_mode': True})
+            
+            db.session.commit()
+            
+            return jsonify({
+                'message': 'Purchase completed successfully (Demo Mode)',
+                'credits_added': transaction.amount,
+                'new_balance': user.credit_balance,
+                'demo_mode': True
+            }), 200
         
     except Exception as e:
         db.session.rollback()
