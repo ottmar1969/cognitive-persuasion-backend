@@ -34,8 +34,12 @@ def create_app():
     db.init_app(app)
     jwt = JWTManager(app)
     
-    # Enable CORS for all routes
-    CORS(app, origins="*", allow_headers=["Content-Type", "Authorization"])
+    # Enhanced CORS configuration
+    CORS(app, 
+         origins=["*"],
+         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+         allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+         supports_credentials=True)
     
     # Health check endpoint
     @app.route('/api/health')
@@ -50,11 +54,11 @@ def create_app():
             "version": "1.0.0",
             "status": "running",
             "endpoints": {
-                "health": "/api/health",
                 "auth": "/api/auth",
-                "businesses": "/api/businesses",
+                "businesses": "/api/businesses", 
                 "audiences": "/api/audiences",
-                "payments": "/api/payments"
+                "payments": "/api/payments",
+                "health": "/api/health"
             }
         })
     
@@ -64,23 +68,18 @@ def create_app():
     app.register_blueprint(audience_bp, url_prefix='/api/audiences')
     app.register_blueprint(payment_bp, url_prefix='/api/payments')
     
-    # Create database tables
+    # Create tables
     with app.app_context():
-        try:
-            db.create_all()
-            
-            # Initialize predefined business types and audiences
-            from src.utils.init_data_simple import initialize_predefined_data
-            initialize_predefined_data()
-        except Exception as e:
-            print(f"Database initialization error: {e}")
+        db.create_all()
+        # Initialize sample data
+        from src.utils.init_data_simple import init_sample_data
+        init_sample_data()
     
     return app
 
-# Create the app instance
+# Create the app
 app = create_app()
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    app.run(debug=True, host='0.0.0.0', port=5000)
 
