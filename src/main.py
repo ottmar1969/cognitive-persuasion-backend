@@ -46,9 +46,23 @@ def create_app():
     def health_check():
         return jsonify({"status": "healthy", "message": "Cognitive Persuasion Engine API is running"})
     
-    # Root endpoint
+    # Root endpoint - serve frontend
     @app.route('/')
     def root():
+        return send_from_directory('static', 'index.html')
+    
+    # Serve static files
+    @app.route('/<path:path>')
+    def serve_static(path):
+        try:
+            return send_from_directory('static', path)
+        except:
+            # If file not found, serve index.html for SPA routing
+            return send_from_directory('static', 'index.html')
+    
+    # API root endpoint
+    @app.route('/api')
+    def api_root():
         return jsonify({
             "message": "Cognitive Persuasion Engine API",
             "version": "1.0.0",
