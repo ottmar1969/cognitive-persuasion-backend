@@ -1,23 +1,19 @@
 from flask import Blueprint, request, jsonify
 from src.models.user_simple import db, BusinessType
+import uuid
+from datetime import datetime
 
 business_bp = Blueprint('business', __name__)
 
 @business_bp.route('', methods=['GET'])
 def get_business_types():
-    """Get all business types (predefined + session-based custom)"""
+    """Get all business types (no auth required)"""
     try:
-        # Get session fingerprint from request
-        session_id = getattr(request, 'fingerprint', 'anonymous')
-        
-        # Get predefined business types (user_id is None) and session's custom business types
-        business_types = BusinessType.query.filter(
-            (BusinessType.user_id == session_id) | (BusinessType.user_id == None)
-        ).all()
+        # Get all business types for demo purposes
+        business_types = BusinessType.query.all()
         
         return jsonify({
-            'business_types': [bt.to_dict() for bt in business_types],
-            'session_id': session_id
+            'business_types': [bt.to_dict() for bt in business_types]
         }), 200
         
     except Exception as e:
@@ -25,14 +21,11 @@ def get_business_types():
 
 @business_bp.route('', methods=['POST'])
 def create_business_type():
-    """Create a new custom business type"""
+    """Create a new business type (no auth required)"""
     try:
         data = request.get_json()
         if not data:
             return jsonify({'message': 'No data provided'}), 400
-        
-        # Get session fingerprint from request
-        session_id = getattr(request, 'fingerprint', 'anonymous')
         
         name = data.get('name', '').strip()
         description = data.get('description', '').strip()
@@ -41,27 +34,21 @@ def create_business_type():
         if not name:
             return jsonify({'message': 'Business name is required'}), 400
         
-        if not description:
-            return jsonify({'message': 'Business description is required'}), 400
-        
-        if not industry_category:
-            return jsonify({'message': 'Industry category is required'}), 400
-        
-        # Check if business type already exists for this session
-        existing = BusinessType.query.filter_by(
-            name=name, 
-            user_id=session_id
-        ).first()
+        # Check if business type with this name already exists
+        existing = BusinessType.query.filter_by(name=name).first()
         
         if existing:
-            return jsonify({'message': 'Business type with this name already exists'}), 409
+            return jsonify({'message': 'A business type with this name already exists'}), 409
         
-        # Create new business type
+        # Create new business type with generated ID
         business_type = BusinessType(
+            business_type_id=str(uuid.uuid4()),
+            user_id=None,  # No user association in no-auth mode
             name=name,
             description=description,
             industry_category=industry_category,
-            user_id=session_id  # Use session fingerprint instead of user_id
+            is_custom=True,
+            created_at=datetime.utcnow()
         )
         
         db.session.add(business_type)
@@ -69,52 +56,66 @@ def create_business_type():
         
         return jsonify({
             'message': 'Business type created successfully',
-            'business_type': business_type.to_dict(),
-            'session_id': session_id
+            'business_type': business_type.to_dict()
         }), 201
         
     except Exception as e:
         db.session.rollback()
         return jsonify({'message': f'Failed to create business type: {str(e)}'}), 500
 
-@business_bp.route('/<int:business_id>', methods=['PUT'])
-def update_business_type(business_id):
-    """Update a business type"""
+@business_bp.route('/<business_type_id>', methods=['GET'])
+def get_business_type(business_type_id):
+    """Get a specific business type (no auth required)"""
     try:
-        # Get session fingerprint from request
-        session_id = getattr(request, 'fingerprint', 'anonymous')
-        
-        business_type = BusinessType.query.filter_by(
-            business_type_id=business_id,
-            user_id=session_id
-        ).first()
+        business_type = BusinessType.query.filter_by(business_type_id=business_type_id).first()
         
         if not business_type:
-            return jsonify({'message': 'Business type not found or access denied'}), 404
+            return jsonify({'message': 'Business type not found'}), 404
+        
+        return jsonify({
+            'business_type': business_type.to_dict()
+        }), 200
+        
+    except Exception as e:
+        return jsonify({'message': f'Failed to get business type: {str(e)}'}), 500
+
+@business_bp.route('/<business_type_id>', methods=['PUT'])
+def update_business_type(business_type_id):
+    """Update a business type (no auth required)"""
+    try:
+        business_type = BusinessType.query.filter_by(business_type_id=business_type_id).first()
+        
+        if not business_type:
+            return jsonify({'message': 'Business type not found'}), 404
         
         data = request.get_json()
         if not data:
             return jsonify({'message': 'No data provided'}), 400
         
-        # Update fields if provided
+        # Update fields
         if 'name' in data:
             name = data['name'].strip()
             if not name:
                 return jsonify({'message': 'Business name cannot be empty'}), 400
+            
+            # Check for duplicate name
+            existing = BusinessType.query.filter(
+                BusinessType.name == name,
+                BusinessType.business_type_id != business_type_id
+            ).first()
+            
+            if existing:
+                return jsonify({'message': 'A business type with this name already exists'}), 409
+            
             business_type.name = name
         
         if 'description' in data:
-            description = data['description'].strip()
-            if not description:
-                return jsonify({'message': 'Business description cannot be empty'}), 400
-            business_type.description = description
+            business_type.description = data['description'].strip()
         
         if 'industry_category' in data:
-            industry_category = data['industry_category'].strip()
-            if not industry_category:
-                return jsonify({'message': 'Industry category cannot be empty'}), 400
-            business_type.industry_category = industry_category
+            business_type.industry_category = data['industry_category'].strip()
         
+        business_type.updated_at = datetime.utcnow()
         db.session.commit()
         
         return jsonify({
@@ -126,24 +127,14 @@ def update_business_type(business_id):
         db.session.rollback()
         return jsonify({'message': f'Failed to update business type: {str(e)}'}), 500
 
-@business_bp.route('/<int:business_id>', methods=['DELETE'])
-def delete_business_type(business_id):
-    """Delete a business type"""
+@business_bp.route('/<business_type_id>', methods=['DELETE'])
+def delete_business_type(business_type_id):
+    """Delete a business type (no auth required)"""
     try:
-        # Get session fingerprint from request
-        session_id = getattr(request, 'fingerprint', 'anonymous')
-        
-        business_type = BusinessType.query.filter_by(
-            business_type_id=business_id,
-            user_id=session_id
-        ).first()
+        business_type = BusinessType.query.filter_by(business_type_id=business_type_id).first()
         
         if not business_type:
-            return jsonify({'message': 'Business type not found or access denied'}), 404
-        
-        # Don't allow deletion of predefined business types
-        if business_type.user_id is None:
-            return jsonify({'message': 'Cannot delete predefined business types'}), 403
+            return jsonify({'message': 'Business type not found'}), 404
         
         db.session.delete(business_type)
         db.session.commit()
