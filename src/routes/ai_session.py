@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from src.models.user import db, User, BusinessType, TargetAudience, AISession, SessionStatus
-from src.utils.ai_service import AIService
+from models.user import db, User, BusinessType, TargetAudience, AISession, SessionStatus
+from utils.ai_service import AIService
 from datetime import datetime, timezone
 import uuid as python_uuid
 
