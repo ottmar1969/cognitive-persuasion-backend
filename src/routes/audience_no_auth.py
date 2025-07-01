@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from src.models.user_simple import db, TargetAudience
+from models.user_simple import db, TargetAudience
 
 audience_bp = Blueprint('audience', __name__)
 
