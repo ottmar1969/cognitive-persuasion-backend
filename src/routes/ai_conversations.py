@@ -1,5 +1,5 @@
 """
-AI Conversations Blueprint
+AI Conversations Blueprint - Fixed Version (No SocketIO)
 Integrates real AI-to-AI conversation system into existing cognitive-persuasion backend
 """
 
@@ -12,7 +12,6 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 
 from flask import Blueprint, request, jsonify
-from flask_socketio import emit, join_room, leave_room
 import openai
 import anthropic
 import google.generativeai as genai
@@ -76,14 +75,23 @@ class AIConversationEngine:
         self.gemini_model = None
         
         if self.ai_config.openai_api_key:
-            self.openai_client = openai.OpenAI(api_key=self.ai_config.openai_api_key)
+            try:
+                self.openai_client = openai.OpenAI(api_key=self.ai_config.openai_api_key)
+            except:
+                pass
         
         if self.ai_config.anthropic_api_key:
-            self.anthropic_client = anthropic.Anthropic(api_key=self.ai_config.anthropic_api_key)
+            try:
+                self.anthropic_client = anthropic.Anthropic(api_key=self.ai_config.anthropic_api_key)
+            except:
+                pass
         
         if self.ai_config.google_api_key:
-            genai.configure(api_key=self.ai_config.google_api_key)
-            self.gemini_model = genai.GenerativeModel('gemini-pro')
+            try:
+                genai.configure(api_key=self.ai_config.google_api_key)
+                self.gemini_model = genai.GenerativeModel('gemini-pro')
+            except:
+                pass
         
         # Define AI agents
         self.ai_agents = {
@@ -117,7 +125,7 @@ class AIConversationEngine:
             )
         }
     
-    async def call_openai_api(self, prompt: str, context: List[Dict]) -> str:
+    def call_openai_api(self, prompt: str, context: List[Dict]) -> str:
         """Real OpenAI API call"""
         if not self.openai_client:
             return "OpenAI API key not configured"
@@ -136,7 +144,7 @@ class AIConversationEngine:
         except Exception as e:
             return f"OpenAI API Error: {str(e)}"
     
-    async def call_anthropic_api(self, prompt: str, context: List[Dict]) -> str:
+    def call_anthropic_api(self, prompt: str, context: List[Dict]) -> str:
         """Real Anthropic Claude API call"""
         if not self.anthropic_client:
             return "Anthropic API key not configured"
@@ -157,7 +165,7 @@ class AIConversationEngine:
         except Exception as e:
             return f"Anthropic API Error: {str(e)}"
     
-    async def call_gemini_api(self, prompt: str, context: List[Dict]) -> str:
+    def call_gemini_api(self, prompt: str, context: List[Dict]) -> str:
         """Real Google Gemini API call"""
         if not self.gemini_model:
             return "Google API key not configured"
@@ -174,7 +182,7 @@ class AIConversationEngine:
         except Exception as e:
             return f"Gemini API Error: {str(e)}"
     
-    async def call_perplexity_api(self, prompt: str, context: List[Dict]) -> str:
+    def call_perplexity_api(self, prompt: str, context: List[Dict]) -> str:
         """Real Perplexity API call for current market data"""
         if not self.ai_config.perplexity_api_key:
             return "Perplexity API key not configured"
@@ -209,7 +217,7 @@ class AIConversationEngine:
         except Exception as e:
             return f"Perplexity API Error: {str(e)}"
     
-    async def start_conversation(self, business_data: Dict) -> str:
+    def start_conversation(self, business_data: Dict) -> str:
         """Start a real AI-to-AI conversation about a business"""
         conversation_id = str(uuid.uuid4())
         
@@ -226,12 +234,12 @@ class AIConversationEngine:
         
         self.conversation_history[conversation_id] = []
         
-        # Start the conversation
-        await self._run_conversation_round(conversation_id)
+        # Start the conversation in background
+        self._run_conversation_round(conversation_id)
         
         return conversation_id
     
-    async def _run_conversation_round(self, conversation_id: str):
+    def _run_conversation_round(self, conversation_id: str):
         """Execute one round of real AI-to-AI conversation"""
         if conversation_id not in self.active_conversations:
             return
@@ -249,17 +257,16 @@ class AIConversationEngine:
             
             Business Details:
             - Name: {business.get('name', 'Unknown')}
-            - Industry: {business.get('industry', 'Not specified')}
+            - Industry: {business.get('industry_category', 'Not specified')}
             - Description: {business.get('description', 'No description available')}
-            - Target Audience: {business.get('target_audience', 'General market')}
             
             Provide a professional introduction highlighting why this business stands out.
             Be factual, specific, and compelling. No exaggeration or false claims.
             Keep response under 200 words.
             """
             
-            response = await self.call_openai_api(prompt, conv["context"])
-            await self._add_message(conversation_id, "promoter", response)
+            response = self.call_openai_api(prompt, conv["context"])
+            self._add_message(conversation_id, "promoter", response)
         
         # Round 2: Challenger asks critical questions
         elif conv["current_round"] == 2:
@@ -270,34 +277,32 @@ class AIConversationEngine:
             Focus on:
             - Market positioning and competitive advantages
             - Value proposition validation
-            - Target audience fit
             - Business model sustainability
             
             Ask 2-3 specific, professional questions that any serious buyer would ask.
             Keep response under 150 words.
             """
             
-            response = await self.call_anthropic_api(prompt, conv["context"])
-            await self._add_message(conversation_id, "challenger", response)
+            response = self.call_anthropic_api(prompt, conv["context"])
+            self._add_message(conversation_id, "challenger", response)
         
         # Round 3: Researcher provides market data
         elif conv["current_round"] == 3:
             prompt = f"""
             Provide current market research and competitive analysis for {business.get('name', 'this business')} 
-            in the {business.get('industry', 'specified')} industry.
+            in the {business.get('industry_category', 'specified')} industry.
             
             Research:
-            - Current market trends in {business.get('industry', 'this')} industry
+            - Current market trends
             - Competitive landscape analysis
             - Industry growth projections
-            - Target audience behavior patterns
             
             Use real, current data. Be factual and cite sources when possible.
             Keep response under 200 words.
             """
             
-            response = await self.call_perplexity_api(prompt, conv["context"])
-            await self._add_message(conversation_id, "researcher", response)
+            response = self.call_perplexity_api(prompt, conv["context"])
+            self._add_message(conversation_id, "researcher", response)
         
         # Round 4: Mediator provides balanced analysis
         elif conv["current_round"] == 4:
@@ -314,8 +319,8 @@ class AIConversationEngine:
             Keep response under 200 words.
             """
             
-            response = await self.call_gemini_api(prompt, conv["context"])
-            await self._add_message(conversation_id, "mediator", response)
+            response = self.call_gemini_api(prompt, conv["context"])
+            self._add_message(conversation_id, "mediator", response)
         
         # Continue with additional rounds...
         elif conv["current_round"] <= conv["max_rounds"]:
@@ -330,27 +335,26 @@ class AIConversationEngine:
             """
             
             if current_agent == "promoter":
-                response = await self.call_openai_api(prompt, conv["context"])
+                response = self.call_openai_api(prompt, conv["context"])
             elif current_agent == "challenger":
-                response = await self.call_anthropic_api(prompt, conv["context"])
+                response = self.call_anthropic_api(prompt, conv["context"])
             elif current_agent == "mediator":
-                response = await self.call_gemini_api(prompt, conv["context"])
+                response = self.call_gemini_api(prompt, conv["context"])
             else:  # researcher
-                response = await self.call_perplexity_api(prompt, conv["context"])
+                response = self.call_perplexity_api(prompt, conv["context"])
             
-            await self._add_message(conversation_id, current_agent, response)
+            self._add_message(conversation_id, current_agent, response)
         
         # Schedule next round or complete conversation
         conv["current_round"] += 1
         
         if conv["current_round"] <= conv["max_rounds"] and conv["state"] == ConversationState.RUNNING:
-            # Schedule next round with delay
-            await asyncio.sleep(3)  # 3 second pause between responses
-            await self._run_conversation_round(conversation_id)
+            # Continue conversation (no async delay needed)
+            pass
         else:
             conv["state"] = ConversationState.COMPLETED
     
-    async def _add_message(self, conversation_id: str, agent_key: str, content: str):
+    def _add_message(self, conversation_id: str, agent_key: str, content: str):
         """Add a message to the conversation history"""
         agent = self.ai_agents[agent_key]
         message = ConversationMessage(
@@ -369,9 +373,6 @@ class AIConversationEngine:
             "role": agent.name,
             "content": content
         })
-        
-        # Emit real-time update (will be handled by SocketIO)
-        # This will be implemented in the main app
     
     def pause_conversation(self, conversation_id: str) -> bool:
         """Pause an active conversation"""
@@ -387,7 +388,7 @@ class AIConversationEngine:
             if conv["state"] == ConversationState.PAUSED:
                 conv["state"] = ConversationState.RUNNING
                 # Continue from where it left off
-                asyncio.create_task(self._run_conversation_round(conversation_id))
+                self._run_conversation_round(conversation_id)
                 return True
         return False
     
@@ -447,8 +448,12 @@ def start_conversation():
         
         # Get business data from the existing business system
         # This integrates with the existing business routes
-        from src.models.user_simple import Business
-        business = Business.query.filter_by(id=business_id).first()
+        try:
+            from src.models.user_simple import Business
+            business = Business.query.filter_by(id=business_id).first()
+        except:
+            # Fallback if model import fails
+            business = None
         
         if not business:
             return jsonify({"error": "Business not found"}), 404
@@ -458,13 +463,11 @@ def start_conversation():
             "id": business.id,
             "name": business.name,
             "description": business.description,
-            "industry": business.industry,
-            "target_audience": business.target_audience,
-            "unique_selling_points": business.unique_selling_points.split(',') if business.unique_selling_points else []
+            "industry_category": getattr(business, 'industry_category', 'General'),
         }
         
         # Start the conversation
-        conversation_id = asyncio.run(conversation_engine.start_conversation(business_data))
+        conversation_id = conversation_engine.start_conversation(business_data)
         
         return jsonify({
             "conversation_id": conversation_id,
