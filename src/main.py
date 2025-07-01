@@ -1,21 +1,21 @@
 import os
 import sys
 from datetime import timedelta
-import hashlib
-import time
-from flask import Flask, send_from_directory, jsonify, request
+# DON'T CHANGE THIS !!!
+sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
+
+from flask import Flask, send_from_directory, jsonify
 from flask_cors import CORS
+from flask_jwt_extended import JWTManager
 from dotenv import load_dotenv
 
-# Import with correct relative paths
-from models.user_simple import db
-from routes.auth_simple import auth_bp
-from routes.business_no_auth import business_bp
-from routes.payment_simple import payment_bp
-from routes.ai_conversations import ai_conversations_bp
-from routes.complete_publishing import complete_publishing_bp
-from routes.ai_conversations import ai_conversations_bp
-app.register_blueprint(ai_conversations_bp, url_prefix='/api/ai-conversations')
+from src.models.user_simple import db
+from src.routes.auth_simple import auth_bp
+from src.routes.business_no_auth import business_bp
+from src.routes.audience_simple import audience_bp
+from src.routes.payment_simple import payment_bp
+from src.routes.ai_conversations import ai_conversations_bp
+from src.routes.ai_search_optimization import ai_search_bp
 
 # Load environment variables
 load_dotenv()
@@ -26,127 +26,83 @@ def create_app():
     # Configuration
     app.config['SECRET_KEY'] = os.getenv('SECRET_KEY', 'dev-secret-key-change-in-production')
     
-    # Database configuration
+    # Use persistent SQLite database for deployment
     app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv('DATABASE_URL', 'sqlite:///cognitive_persuasion.db')
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    app.config['SQLALCHEMY_ENGINE_OPTIONS'] = {
-        'pool_timeout': 20,
-        'pool_recycle': -1,
-        'pool_pre_ping': True
-    }
-    
-    # AI API Configuration
-    app.config['OPENAI_API_KEY'] = os.getenv('OPENAI_API_KEY', '')
-    app.config['ANTHROPIC_API_KEY'] = os.getenv('ANTHROPIC_API_KEY', '')
-    app.config['GOOGLE_API_KEY'] = os.getenv('GOOGLE_API_KEY', '')
-    app.config['PERPLEXITY_API_KEY'] = os.getenv('PERPLEXITY_API_KEY', '')
-    
-    # Publishing API Configuration
-    app.config['GOOGLE_MY_BUSINESS_API_KEY'] = os.getenv('GOOGLE_MY_BUSINESS_API_KEY', '')
-    app.config['BING_PLACES_API_KEY'] = os.getenv('BING_PLACES_API_KEY', '')
-    app.config['YELP_API_KEY'] = os.getenv('YELP_API_KEY', '')
-    
-    # Contact Configuration
-    app.config['CONTACT_NAME'] = 'O. Francisca'
-    app.config['CONTACT_WHATSAPP'] = '+31628073996'
-    app.config['COMPANY_URL'] = 'VisitorIntel'
+    app.config['JWT_SECRET_KEY'] = os.getenv('JWT_SECRET_KEY', 'jwt-secret-change-in-production')
+    app.config['JWT_ACCESS_TOKEN_EXPIRES'] = timedelta(hours=24)
     
     # Initialize extensions
     db.init_app(app)
-    CORS(app, origins='*')
+    jwt = JWTManager(app)
     
-    # Create tables and default data
-    with app.app_context():
-        db.create_all()
-        
-        # Add default business types
-        from models.user_simple import BusinessType
-        if BusinessType.query.count() == 0:
-            default_businesses = [
-                {
-                    'name': 'Roofing Services',
-                    'description': 'Residential and commercial roofing installation, repair, and maintenance services',
-                    'industry_category': 'Construction & Home Services'
-                },
-                {
-                    'name': 'Digital Marketing Agency',
-                    'description': 'Full-service digital marketing including SEO, PPC, social media, and content marketing',
-                    'industry_category': 'Marketing & Advertising'
-                },
-                {
-                    'name': 'Software as a Service (SaaS)',
-                    'description': 'Cloud-based software solutions for business productivity and automation',
-                    'industry_category': 'Technology'
-                },
-                {
-                    'name': 'E-commerce Store',
-                    'description': 'Online retail business selling products directly to consumers',
-                    'industry_category': 'Retail & E-commerce'
-                },
-                {
-                    'name': 'Consulting Services',
-                    'description': 'Professional consulting services for business strategy and operations',
-                    'industry_category': 'Professional Services'
-                }
-            ]
-            
-            for biz in default_businesses:
-                business_type = BusinessType(
-                    name=biz['name'],
-                    description=biz['description'],
-                    industry_category=biz['industry_category'],
-                    is_custom=False
-                )
-                db.session.add(business_type)
-            
-            db.session.commit()
-    
-    # Register blueprints
-    app.register_blueprint(auth_bp, url_prefix='/api/auth')
-    app.register_blueprint(business_bp, url_prefix='/api')
-    app.register_blueprint(payment_bp, url_prefix='/api/payments')
-    app.register_blueprint(ai_conversations_bp, url_prefix='/api/ai-conversations')
-    app.register_blueprint(complete_publishing_bp, url_prefix='/api/publishing')
+    # Enhanced CORS configuration
+    CORS(app, 
+         origins=["*"],
+         methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+         allow_headers=["Content-Type", "Authorization", "Access-Control-Allow-Credentials"],
+         supports_credentials=True)
     
     # Health check endpoint
     @app.route('/api/health')
-    def health():
+    def health_check():
         return jsonify({
-            "status": "healthy",
-            "features": {
-                "ai_conversations": "enabled",
-                "seo_publishing": "enabled", 
-                "schema_markup": "enabled",
-                "directory_submissions": "enabled",
-                "social_media_content": "enabled",
-                "analytics_tracking": "enabled"
-            },
-            "contact": app.config['CONTACT_NAME'],
-            "whatsapp": app.config['CONTACT_WHATSAPP']
+            "status": "healthy", 
+            "message": "Cognitive Persuasion Engine API is running",
+            "authentication": "disabled",
+            "contact": "O. Francisca",
+            "whatsapp": "+31628073996"
         })
     
-    # Audiences endpoint
-    @app.route('/api/audiences', methods=['GET', 'POST'])
-    def audiences():
-        if request.method == 'GET':
-            return jsonify([])
-        return jsonify({"message": "Audience created"})
-    
-    # Root endpoint
+    # Root endpoint - serve frontend
     @app.route('/')
-    def serve():
+    def root():
+        return send_from_directory('static', 'index.html')
+    
+    # Serve static files
+    @app.route('/<path:path>')
+    def serve_static(path):
+        try:
+            return send_from_directory('static', path)
+        except:
+            # If file not found, serve index.html for SPA routing
+            return send_from_directory('static', 'index.html')
+    
+    # API root endpoint
+    @app.route('/api')
+    def api_root():
         return jsonify({
-            "message": "Cognitive Persuasion Engine API - Complete System",
-            "version": "2.0",
-            "features": [
-                "AI Conversations with 4 Expert Models",
-                "Complete SEO Optimization",
-                "Schema Markup Generation", 
-                "Directory Publishing",
-                "Social Media Content",
-                "Analytics Tracking"
-            ]
+            "message": "Cognitive Persuasion Engine API",
+            "version": "1.0.0",
+            "status": "running",
+            "endpoints": {
+                "auth": "/api/auth",
+                "businesses": "/api/businesses", 
+                "audiences": "/api/audiences",
+                "payments": "/api/payments",
+                "ai-conversations": "/api/ai-conversations",
+                "ai-search": "/api/ai-search",
+                "health": "/api/health"
+            }
         })
+    
+    # Register blueprints - ALL INSIDE THE FUNCTION
+    app.register_blueprint(auth_bp, url_prefix='/api/auth')
+    app.register_blueprint(business_bp, url_prefix='/api/businesses')
+    app.register_blueprint(audience_bp, url_prefix='/api/audiences')
+    app.register_blueprint(payment_bp, url_prefix='/api/payments')
+    app.register_blueprint(ai_conversations_bp, url_prefix='/api/ai-conversations')
+    app.register_blueprint(ai_search_bp)
+    
+    # Create tables
+    with app.app_context():
+        db.create_all()
+        # Initialize sample data
+        try:
+            from src.utils.init_data_simple import initialize_predefined_data
+            initialize_predefined_data()
+        except Exception as e:
+            print(f"Warning: Could not initialize predefined data: {e}")
     
     return app
 
@@ -154,5 +110,6 @@ def create_app():
 app = create_app()
 
 if __name__ == '__main__':
-    port = int(os.environ.get('PORT', 5000))
-    app.run(host='0.0.0.0', port=port, debug=False)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(debug=True, host='0.0.0.0', port=port)
+
