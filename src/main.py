@@ -11,8 +11,7 @@ from dotenv import load_dotenv
 
 from src.models.user_simple import db
 from src.routes.auth_simple import auth_bp
-from src.routes.business_simple import business_bp
-from src.routes.audience_simple import audience_bp
+from src.routes.business_no_auth import business_bp
 from src.routes.payment_simple import payment_bp
 from src.routes.ai_conversations import ai_conversations_bp
 
