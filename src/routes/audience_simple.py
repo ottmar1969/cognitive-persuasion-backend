@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from src.models.user_simple import db, User, TargetAudience
+from models.user_simple import db, User, TargetAudience
 
 audience_bp = Blueprint('audience', __name__)
 
