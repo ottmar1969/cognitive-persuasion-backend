@@ -14,6 +14,8 @@ from routes.business_no_auth import business_bp
 from routes.payment_simple import payment_bp
 from routes.ai_conversations import ai_conversations_bp
 from routes.complete_publishing import complete_publishing_bp
+from routes.ai_conversations import ai_conversations_bp
+app.register_blueprint(ai_conversations_bp, url_prefix='/api/ai-conversations')
 
 # Load environment variables
 load_dotenv()
