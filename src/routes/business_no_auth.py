@@ -1,5 +1,5 @@
 from flask import Blueprint, request, jsonify
-from src.models.user_simple import db, BusinessType
+from models.user_simple import db, BusinessType
 import uuid
 from datetime import datetime
 
