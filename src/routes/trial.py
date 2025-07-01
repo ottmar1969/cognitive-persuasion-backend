@@ -2,8 +2,8 @@ from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
 from datetime import datetime
 
-from src.models.user_simple import db, User
-from src.models.free_trial import FreeTrialManager
+from models.user_simple import db, User
+from models.free_trial import FreeTrialManager
 
 trial_bp = Blueprint('trial', __name__)
 
