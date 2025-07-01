@@ -4,8 +4,8 @@ import uuid as python_uuid
 import asyncio
 from datetime import datetime
 
-from src.models.user import db, User, BusinessType, TargetAudience, AISession, CreditTransaction
-from src.utils.multi_ai_service import multi_ai_service
+from models.user import db, User, BusinessType, TargetAudience, AISession, CreditTransaction
+from utils.multi_ai_service import multi_ai_service
 
 ai_session_bp = Blueprint('ai_session_enhanced', __name__)
 
