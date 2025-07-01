@@ -8,12 +8,12 @@ from flask_cors import CORS
 from flask_jwt_extended import JWTManager
 from dotenv import load_dotenv
 
-from src.models.user_simple import db
-from src.routes.auth_simple import auth_bp
-from src.routes.business_no_auth import business_bp
-from src.routes.payment_simple import payment_bp
-from src.routes.ai_conversations import ai_conversations_bp
-from src.routes.ai_search_optimization import ai_search_bp
+from models.user_simple import db
+from routes.auth_simple import auth_bp
+from routes.business_no_auth import business_bp
+from routes.payment_simple import payment_bp
+from routes.ai_conversations import ai_conversations_bp
+from routes.ai_search_optimization import ai_search_bp
 
 # Load environment variables
 load_dotenv()
@@ -105,7 +105,7 @@ def create_app():
         db.create_all()
         # Initialize sample data
         try:
-            from src.utils.init_data_simple import initialize_predefined_data
+            from utils.init_data_simple import initialize_predefined_data
             initialize_predefined_data()
         except Exception as e:
             print(f"Warning: Could not initialize predefined data: {e}")
