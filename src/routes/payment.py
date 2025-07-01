@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify, current_app
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from src.models.user import db, User, CreditTransaction, TransactionType, TransactionStatus
-from src.utils.paypal_service import PayPalService
+from models.user import db, User, CreditTransaction, TransactionType, TransactionStatus
+from utils.paypal_service import PayPalService
 from decimal import Decimal
 import uuid as python_uuid
 
