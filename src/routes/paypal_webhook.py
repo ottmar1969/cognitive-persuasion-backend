@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify, current_app
-from src.models.user_simple import db, CreditTransaction, TransactionStatus, User
-from src.utils.paypal_service import PayPalService
+from models.user_simple import db, CreditTransaction, TransactionStatus, User
+from utils.paypal_service import PayPalService
 from datetime import datetime, timezone
 import json
 
