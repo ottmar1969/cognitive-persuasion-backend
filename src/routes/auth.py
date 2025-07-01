@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity, create_access_token
-from src.models.user import db, User
+from models.user import db, User
 from datetime import datetime, timezone
 import re
 
