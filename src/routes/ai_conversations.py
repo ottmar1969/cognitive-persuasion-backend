@@ -247,7 +247,7 @@ def start_conversation():
         
         # Get business data from the existing business system
         try:
-            from src.models.user_simple import Business
+            from models.user_simple import Business
             business = Business.query.filter_by(id=business_id).first()
         except:
             # Fallback if model import fails
