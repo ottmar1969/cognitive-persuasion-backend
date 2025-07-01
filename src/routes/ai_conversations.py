@@ -1,33 +1,20 @@
 """
-AI Conversations Blueprint - Fixed Version (No SocketIO)
-Integrates real AI-to-AI conversation system into existing cognitive-persuasion backend
+AI Conversations Blueprint - Simplified Version (No External AI Dependencies)
+Integrates AI conversation system into existing cognitive-persuasion backend
 """
 
-import asyncio
 import json
 import uuid
 from datetime import datetime
 from typing import Dict, List, Optional
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 from enum import Enum
 
 from flask import Blueprint, request, jsonify
-import openai
-import anthropic
-import google.generativeai as genai
-import requests
 import os
 
 # Create blueprint
 ai_conversations_bp = Blueprint('ai_conversations', __name__)
-
-# AI Configuration
-@dataclass
-class AIConfig:
-    openai_api_key: str
-    anthropic_api_key: str
-    google_api_key: str
-    perplexity_api_key: str
 
 class ConversationState(Enum):
     STOPPED = "stopped"
@@ -54,44 +41,12 @@ class ConversationMessage:
 
 class AIConversationEngine:
     """
-    AI-to-AI conversation engine integrated with existing business system
+    AI-to-AI conversation engine with simulated responses (for demo)
     """
     
     def __init__(self):
         self.active_conversations: Dict[str, Dict] = {}
         self.conversation_history: Dict[str, List[ConversationMessage]] = {}
-        
-        # Get API keys from environment
-        self.ai_config = AIConfig(
-            openai_api_key=os.getenv('OPENAI_API_KEY', ''),
-            anthropic_api_key=os.getenv('ANTHROPIC_API_KEY', ''),
-            google_api_key=os.getenv('GOOGLE_API_KEY', ''),
-            perplexity_api_key=os.getenv('PERPLEXITY_API_KEY', '')
-        )
-        
-        # Initialize AI clients if keys are available
-        self.openai_client = None
-        self.anthropic_client = None
-        self.gemini_model = None
-        
-        if self.ai_config.openai_api_key:
-            try:
-                self.openai_client = openai.OpenAI(api_key=self.ai_config.openai_api_key)
-            except:
-                pass
-        
-        if self.ai_config.anthropic_api_key:
-            try:
-                self.anthropic_client = anthropic.Anthropic(api_key=self.ai_config.anthropic_api_key)
-            except:
-                pass
-        
-        if self.ai_config.google_api_key:
-            try:
-                genai.configure(api_key=self.ai_config.google_api_key)
-                self.gemini_model = genai.GenerativeModel('gemini-pro')
-            except:
-                pass
         
         # Define AI agents
         self.ai_agents = {
@@ -125,100 +80,44 @@ class AIConversationEngine:
             )
         }
     
-    def call_openai_api(self, prompt: str, context: List[Dict]) -> str:
-        """Real OpenAI API call"""
-        if not self.openai_client:
-            return "OpenAI API key not configured"
+    def generate_ai_response(self, agent_key: str, business_data: Dict, round_num: int) -> str:
+        """Generate simulated AI responses for demo purposes"""
+        business_name = business_data.get('name', 'this business')
+        industry = business_data.get('industry_category', 'the industry')
+        description = business_data.get('description', 'No description available')
         
-        try:
-            messages = [{"role": "system", "content": prompt}]
-            messages.extend(context[-5:])  # Last 5 messages for context
-            
-            response = self.openai_client.chat.completions.create(
-                model="gpt-4",
-                messages=messages,
-                max_tokens=500,
-                temperature=0.7
-            )
-            return response.choices[0].message.content
-        except Exception as e:
-            return f"OpenAI API Error: {str(e)}"
-    
-    def call_anthropic_api(self, prompt: str, context: List[Dict]) -> str:
-        """Real Anthropic Claude API call"""
-        if not self.anthropic_client:
-            return "Anthropic API key not configured"
-        
-        try:
-            conversation = ""
-            for msg in context[-5:]:  # Last 5 messages
-                conversation += f"{msg['role']}: {msg['content']}\n"
-            
-            full_prompt = f"{prompt}\n\nConversation so far:\n{conversation}\n\nYour response:"
-            
-            response = self.anthropic_client.messages.create(
-                model="claude-3-sonnet-20240229",
-                max_tokens=500,
-                messages=[{"role": "user", "content": full_prompt}]
-            )
-            return response.content[0].text
-        except Exception as e:
-            return f"Anthropic API Error: {str(e)}"
-    
-    def call_gemini_api(self, prompt: str, context: List[Dict]) -> str:
-        """Real Google Gemini API call"""
-        if not self.gemini_model:
-            return "Google API key not configured"
-        
-        try:
-            conversation = ""
-            for msg in context[-5:]:  # Last 5 messages
-                conversation += f"{msg['role']}: {msg['content']}\n"
-            
-            full_prompt = f"{prompt}\n\nConversation context:\n{conversation}\n\nProvide your balanced analysis:"
-            
-            response = self.gemini_model.generate_content(full_prompt)
-            return response.text
-        except Exception as e:
-            return f"Gemini API Error: {str(e)}"
-    
-    def call_perplexity_api(self, prompt: str, context: List[Dict]) -> str:
-        """Real Perplexity API call for current market data"""
-        if not self.ai_config.perplexity_api_key:
-            return "Perplexity API key not configured"
-        
-        try:
-            headers = {
-                "Authorization": f"Bearer {self.ai_config.perplexity_api_key}",
-                "Content-Type": "application/json"
+        responses = {
+            "promoter": {
+                1: f"I'm excited to present {business_name}, a standout company in {industry}. {description} What makes {business_name} exceptional is their commitment to innovation and customer satisfaction. They've positioned themselves uniquely in the market by focusing on quality and reliability. Their approach to business demonstrates clear value proposition and sustainable growth potential.",
+                2: f"Let me address those concerns about {business_name}. Their competitive advantage lies in their deep understanding of {industry} dynamics. They've built strong customer relationships and have a proven track record of delivering results. The market validation speaks for itself through their growing customer base and positive feedback.",
+                3: f"Building on the market research, {business_name} is perfectly positioned to capitalize on current {industry} trends. Their business model aligns with market demands and they have the expertise to execute their vision effectively.",
+                4: f"In conclusion, {business_name} represents a solid investment opportunity in {industry}. They combine market knowledge, operational excellence, and strategic vision to deliver consistent value to their customers."
+            },
+            "challenger": {
+                1: f"While the presentation of {business_name} sounds promising, I have several critical questions. What specific metrics demonstrate their market leadership in {industry}? How do they differentiate from established competitors? What evidence supports their claimed competitive advantages?",
+                2: f"I appreciate the enthusiasm, but let's examine the fundamentals. What's their customer acquisition cost versus lifetime value? How sustainable is their current business model in a competitive {industry} landscape? What are the potential risks and challenges they face?",
+                3: f"The market data is interesting, but how does {business_name} specifically capture this opportunity? What's their go-to-market strategy? Do they have the resources and capabilities to execute at scale?",
+                4: f"Before making any conclusions about {business_name}, we need to see concrete evidence of performance, clear financial projections, and a realistic assessment of market challenges in {industry}."
+            },
+            "mediator": {
+                1: f"Thank you both for your perspectives on {business_name}. This {industry} company presents both opportunities and challenges that deserve balanced consideration. Let's examine the facts objectively and consider multiple viewpoints.",
+                2: f"I see valid points from both sides regarding {business_name}. The enthusiasm is warranted given their {industry} focus, but the critical questions raised are equally important for a complete assessment.",
+                3: f"The market research provides valuable context for {business_name}'s position in {industry}. We should weigh both the opportunities and the competitive challenges they face.",
+                4: f"Based on our discussion, {business_name} shows promise in {industry} but requires careful due diligence. Both the strengths and potential concerns merit serious consideration."
+            },
+            "researcher": {
+                1: f"Current market analysis shows {industry} is experiencing significant growth trends. Key factors include increasing demand, technological advancement, and evolving customer preferences. {business_name} operates in a market segment with strong fundamentals.",
+                2: f"Competitive landscape analysis reveals {industry} has both established players and emerging companies. Market size is expanding, with projected growth rates indicating positive outlook for well-positioned companies like {business_name}.",
+                3: f"Recent industry reports highlight {industry} trends that favor companies with {business_name}'s positioning. Consumer behavior data supports demand for their type of services/products.",
+                4: f"Market research conclusion: {industry} presents viable opportunities for companies with strong execution capabilities. {business_name} operates in a favorable market environment with growth potential."
             }
-            
-            messages = [{"role": "system", "content": prompt}]
-            messages.extend(context[-3:])  # Last 3 messages for context
-            
-            data = {
-                "model": "llama-3.1-sonar-large-128k-online",
-                "messages": messages,
-                "max_tokens": 500,
-                "temperature": 0.3
-            }
-            
-            response = requests.post(
-                "https://api.perplexity.ai/chat/completions",
-                headers=headers,
-                json=data,
-                timeout=30
-            )
-            
-            if response.status_code == 200:
-                return response.json()["choices"][0]["message"]["content"]
-            else:
-                return f"Perplexity API Error: {response.status_code}"
-        except Exception as e:
-            return f"Perplexity API Error: {str(e)}"
+        }
+        
+        agent_responses = responses.get(agent_key, {})
+        return agent_responses.get(round_num, f"Continuing the discussion about {business_name} in {industry}...")
     
     def start_conversation(self, business_data: Dict) -> str:
-        """Start a real AI-to-AI conversation about a business"""
+        """Start a simulated AI-to-AI conversation about a business"""
         conversation_id = str(uuid.uuid4())
         
         # Initialize conversation state
@@ -227,132 +126,34 @@ class AIConversationEngine:
             "business_data": business_data,
             "state": ConversationState.RUNNING,
             "current_round": 1,
-            "max_rounds": 8,
+            "max_rounds": 4,
             "participants": list(self.ai_agents.keys()),
             "context": []
         }
         
         self.conversation_history[conversation_id] = []
         
-        # Start the conversation in background
-        self._run_conversation_round(conversation_id)
+        # Generate initial messages for demo
+        self._generate_conversation_messages(conversation_id)
         
         return conversation_id
     
-    def _run_conversation_round(self, conversation_id: str):
-        """Execute one round of real AI-to-AI conversation"""
+    def _generate_conversation_messages(self, conversation_id: str):
+        """Generate simulated conversation messages"""
         if conversation_id not in self.active_conversations:
             return
         
         conv = self.active_conversations[conversation_id]
-        business = conv["business_data"]
+        business_data = conv["business_data"]
         
-        if conv["state"] != ConversationState.RUNNING:
-            return
+        # Generate messages for each round
+        for round_num in range(1, conv["max_rounds"] + 1):
+            for agent_key in ["promoter", "challenger", "researcher", "mediator"]:
+                content = self.generate_ai_response(agent_key, business_data, round_num)
+                self._add_message(conversation_id, agent_key, content)
         
-        # Round 1: Promoter introduces the business
-        if conv["current_round"] == 1:
-            prompt = f"""
-            You are a professional business promoter. Present {business.get('name', 'this business')} in a compelling but factual way.
-            
-            Business Details:
-            - Name: {business.get('name', 'Unknown')}
-            - Industry: {business.get('industry_category', 'Not specified')}
-            - Description: {business.get('description', 'No description available')}
-            
-            Provide a professional introduction highlighting why this business stands out.
-            Be factual, specific, and compelling. No exaggeration or false claims.
-            Keep response under 200 words.
-            """
-            
-            response = self.call_openai_api(prompt, conv["context"])
-            self._add_message(conversation_id, "promoter", response)
-        
-        # Round 2: Challenger asks critical questions
-        elif conv["current_round"] == 2:
-            prompt = f"""
-            You are a critical business analyst. Review the business presentation and ask tough, 
-            relevant questions about {business.get('name', 'this business')}.
-            
-            Focus on:
-            - Market positioning and competitive advantages
-            - Value proposition validation
-            - Business model sustainability
-            
-            Ask 2-3 specific, professional questions that any serious buyer would ask.
-            Keep response under 150 words.
-            """
-            
-            response = self.call_anthropic_api(prompt, conv["context"])
-            self._add_message(conversation_id, "challenger", response)
-        
-        # Round 3: Researcher provides market data
-        elif conv["current_round"] == 3:
-            prompt = f"""
-            Provide current market research and competitive analysis for {business.get('name', 'this business')} 
-            in the {business.get('industry_category', 'specified')} industry.
-            
-            Research:
-            - Current market trends
-            - Competitive landscape analysis
-            - Industry growth projections
-            
-            Use real, current data. Be factual and cite sources when possible.
-            Keep response under 200 words.
-            """
-            
-            response = self.call_perplexity_api(prompt, conv["context"])
-            self._add_message(conversation_id, "researcher", response)
-        
-        # Round 4: Mediator provides balanced analysis
-        elif conv["current_round"] == 4:
-            prompt = f"""
-            You are a neutral business evaluator. Provide a balanced analysis of the discussion about {business.get('name', 'this business')}.
-            
-            Consider:
-            - Strengths highlighted by the promoter
-            - Valid concerns raised by the analyst
-            - Market data provided by the researcher
-            - Overall business viability
-            
-            Provide an objective assessment with both positives and areas for improvement.
-            Keep response under 200 words.
-            """
-            
-            response = self.call_gemini_api(prompt, conv["context"])
-            self._add_message(conversation_id, "mediator", response)
-        
-        # Continue with additional rounds...
-        elif conv["current_round"] <= conv["max_rounds"]:
-            # Rotate between agents for continued discussion
-            agent_keys = list(self.ai_agents.keys())
-            current_agent = agent_keys[(conv["current_round"] - 1) % len(agent_keys)]
-            
-            prompt = f"""
-            Continue the professional discussion about {business.get('name', 'this business')}.
-            Build on the previous conversation and provide additional insights.
-            Keep response under 150 words and maintain your role as {self.ai_agents[current_agent].role}.
-            """
-            
-            if current_agent == "promoter":
-                response = self.call_openai_api(prompt, conv["context"])
-            elif current_agent == "challenger":
-                response = self.call_anthropic_api(prompt, conv["context"])
-            elif current_agent == "mediator":
-                response = self.call_gemini_api(prompt, conv["context"])
-            else:  # researcher
-                response = self.call_perplexity_api(prompt, conv["context"])
-            
-            self._add_message(conversation_id, current_agent, response)
-        
-        # Schedule next round or complete conversation
-        conv["current_round"] += 1
-        
-        if conv["current_round"] <= conv["max_rounds"] and conv["state"] == ConversationState.RUNNING:
-            # Continue conversation (no async delay needed)
-            pass
-        else:
-            conv["state"] = ConversationState.COMPLETED
+        # Mark as completed
+        conv["state"] = ConversationState.COMPLETED
     
     def _add_message(self, conversation_id: str, agent_key: str, content: str):
         """Add a message to the conversation history"""
@@ -368,7 +169,7 @@ class AIConversationEngine:
         
         self.conversation_history[conversation_id].append(message)
         
-        # Add to context for next AI calls
+        # Add to context
         self.active_conversations[conversation_id]["context"].append({
             "role": agent.name,
             "content": content
@@ -387,8 +188,6 @@ class AIConversationEngine:
             conv = self.active_conversations[conversation_id]
             if conv["state"] == ConversationState.PAUSED:
                 conv["state"] = ConversationState.RUNNING
-                # Continue from where it left off
-                self._run_conversation_round(conversation_id)
                 return True
         return False
     
@@ -438,7 +237,7 @@ conversation_engine = AIConversationEngine()
 # Routes
 @ai_conversations_bp.route('/start', methods=['POST'])
 def start_conversation():
-    """Start a real AI conversation for a business"""
+    """Start a simulated AI conversation for a business"""
     try:
         data = request.json
         business_id = data.get('business_id')
@@ -447,7 +246,6 @@ def start_conversation():
             return jsonify({"error": "business_id is required"}), 400
         
         # Get business data from the existing business system
-        # This integrates with the existing business routes
         try:
             from src.models.user_simple import Business
             business = Business.query.filter_by(id=business_id).first()
@@ -472,7 +270,7 @@ def start_conversation():
         return jsonify({
             "conversation_id": conversation_id,
             "status": "started",
-            "message": "Real AI-to-AI conversation initiated",
+            "message": "AI-to-AI conversation simulation initiated",
             "business_name": business.name
         })
         
@@ -528,16 +326,10 @@ def get_active_conversations():
 @ai_conversations_bp.route('/health', methods=['GET'])
 def ai_health_check():
     """Check AI service availability"""
-    services = {
-        "openai": bool(conversation_engine.ai_config.openai_api_key),
-        "anthropic": bool(conversation_engine.ai_config.anthropic_api_key),
-        "google": bool(conversation_engine.ai_config.google_api_key),
-        "perplexity": bool(conversation_engine.ai_config.perplexity_api_key)
-    }
-    
     return jsonify({
         "status": "healthy",
-        "ai_services": services,
+        "mode": "simulation",
+        "message": "AI conversation simulation ready",
         "active_conversations": len(conversation_engine.active_conversations)
     })
 
