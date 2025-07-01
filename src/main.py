@@ -15,6 +15,8 @@ from src.routes.business_no_auth import business_bp
 from src.routes.payment_simple import payment_bp
 from src.routes.ai_conversations import ai_conversations_bp
 
+from src.routes.ai_search_optimization import ai_search_bp
+
 # Load environment variables
 load_dotenv()
 
@@ -74,6 +76,7 @@ def create_app():
                 "payments": "/api/payments",
                 "ai-conversations": "/api/ai-conversations",
                 "health": "/api/health"
+                "ai-search": "/api/ai-search",
             }
         })
     
@@ -83,7 +86,7 @@ def create_app():
     app.register_blueprint(audience_bp, url_prefix='/api/audiences')
     app.register_blueprint(payment_bp, url_prefix='/api/payments')
     app.register_blueprint(ai_conversations_bp, url_prefix='/api/ai-conversations')
-    
+    app.register_blueprint(ai_search_bp)
     # Create tables
     with app.app_context():
         db.create_all()
