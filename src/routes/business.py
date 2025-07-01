@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from src.models.user import db, User, BusinessType
-from src.utils.init_data import get_predefined_business_types
+from models.user import db, User, BusinessType
+from utils.init_data import get_predefined_business_types
 
 business_bp = Blueprint('business', __name__)
 
