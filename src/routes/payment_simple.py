@@ -1,7 +1,7 @@
 from flask import Blueprint, request, jsonify
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from src.models.user_simple import db, User, CreditTransaction, TransactionType, TransactionStatus
-from src.utils.paypal_service import PayPalService
+from models.user_simple import db, User, CreditTransaction, TransactionType, TransactionStatus
+from utils.paypal_service import PayPalService
 from decimal import Decimal
 from datetime import datetime, timezone
 
